@@ -14,14 +14,14 @@ public class BotResourceHolder : MonoBehaviour
     private Stack<Resource> _resources;
     private BotMover _botMover;
     private Vector3 _availableStackPosition;
-    private int _currentStackCapacity;
+    private bool _isStartUnloading;
 
     public event Action CapacityFilled;
     public event Action NeedResources;
 
     public Transform TargetResourcePoint { get; private set; }
-    public bool IsEnoughCapacity => _maxStackCapacity > _currentStackCapacity;
-    public bool IsNotEmpty => _currentStackCapacity > 0;
+    public bool IsEnoughCapacity => _maxStackCapacity > _resources.Count;
+    public bool IsNotEmpty => _resources.Count > 0;
     
     private void OnEnable()
     {
@@ -47,7 +47,6 @@ public class BotResourceHolder : MonoBehaviour
         
         _resources.Push(resource);
         _availableStackPosition += Vector3.up * resourcePoint.localScale.y;
-        _currentStackCapacity++;
 
         if (IsEnoughCapacity == false)
         {
@@ -66,13 +65,17 @@ public class BotResourceHolder : MonoBehaviour
 
     private void UnloadResources(Stock stock)
     {
-        StartCoroutine(UnloadCycle(stock));
+        if (_isStartUnloading == false)
+        {
+            _isStartUnloading = true;
+            StartCoroutine(UnloadCycle(stock));
+        }
     }
 
     private void RemoveResource(Stock stock)
     {
-        Destroy(_resources.Pop().gameObject);
-        _currentStackCapacity--;
+        Resource resource = _resources.Pop();
+        Destroy(resource.gameObject);
         stock.IncreaseResource();
     }
     
@@ -89,13 +92,14 @@ public class BotResourceHolder : MonoBehaviour
     {
         var waitTime = new WaitForSeconds(_unloadDelay);
 
-        while (_resources.Count > 0)
+        while (IsNotEmpty == true)
         {
             DropResource();
             yield return waitTime;
             RemoveResource(stock);
         }
-        
+
+        _isStartUnloading = false;
         _availableStackPosition = Vector3.zero;
         NeedResources?.Invoke();
     }

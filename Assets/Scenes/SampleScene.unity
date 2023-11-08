@@ -1225,7 +1225,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _minStopDelay: 0.8
-  _maxStopDelay: 2.2
+  _maxStopDelay: 1.6
 --- !u!65 &1613471255
 BoxCollider:
   m_ObjectHideFlags: 0
