@@ -5,53 +5,52 @@ using UnityEngine;
 public class BaseBotCommander : MonoBehaviour
 {
     [SerializeField] private ResourceSpawner _resourceSpawner;
-    [SerializeField] private BotMover _template;
+    [SerializeField] private BotSpawner _botSpawner;
     [SerializeField] private Transform _stockPoint;
-    [SerializeField] private Transform _botSpawnPoint;
-    [SerializeField] private int _maxBotsCount;
-    [SerializeField] private float _botSpawnDelay;
     [SerializeField] private float _botOrderDelay;
-    
-    private List<BotMover> _bots;
+
     private List<Transform> _availableResourcePoints;
     private Queue<BotMover> _waitingBots;
-
+    
     private void OnEnable()
     {
-        _bots = new List<BotMover>();
         _availableResourcePoints = new List<Transform>();
         _waitingBots = new Queue<BotMover>();
-
-        StartCoroutine(BotSpawnCycle());
-        StartCoroutine(BotOrderCycle());
         
-        _resourceSpawner.Spawned += OnSpawnResource;
+        StartCoroutine(BotOrderCycle());
+
+        _botSpawner.Spawned += OnSpawnBot;
     }
 
     private void OnDisable()
     {
-        foreach (BotMover bot in _bots)
+        _botSpawner.Spawned -= OnSpawnBot;
+        
+        foreach (BotMover bot in _botSpawner.GetExistsBots())
         {
             bot.Waited -= OnWaitingBot;
         }
-        
-        _resourceSpawner.Spawned -= OnSpawnResource;
     }
 
-    private void OnSpawnResource(Transform resourcePoint)
+    private void Update()
     {
-        _availableResourcePoints.Add(resourcePoint);
+        ScanForResources();
     }
 
-    private void SpawnBot()
+    private void OnSpawnBot(BotMover bot)
     {
-        if (_bots.Count < _maxBotsCount)
-        {
-            BotMover bot = Instantiate(_template, _botSpawnPoint.position, Quaternion.identity);
-            bot.Waited += OnWaitingBot;
-            bot.SetStock(_stockPoint);
-            _bots.Add(bot);
-        }
+        bot.Waited += OnWaitingBot;
+        bot.SetStock(_stockPoint);
+    }
+    
+    private void OnWaitingBot(BotMover bot)
+    {
+        _waitingBots.Enqueue(bot);
+    }
+
+    private void ScanForResources()
+    {
+        _availableResourcePoints = _resourceSpawner.GetExistsResources();
     }
 
     private void GiveBotOrder()
@@ -82,11 +81,6 @@ public class BaseBotCommander : MonoBehaviour
         }
     }
     
-    private void OnWaitingBot(BotMover bot)
-    {
-        _waitingBots.Enqueue(bot);
-    }
-
     private Transform GetLessDistancePoint(Vector3 botPosition)
     {
         Transform point = _availableResourcePoints[0];
@@ -116,7 +110,7 @@ public class BaseBotCommander : MonoBehaviour
     {
         bool result = false;
 
-        foreach (BotMover bot in _bots)
+        foreach (BotMover bot in _botSpawner.GetExistsBots())
         {
             if (bot.IsWaitNotEmpty == true)
             {
@@ -127,19 +121,7 @@ public class BaseBotCommander : MonoBehaviour
 
         return result;
     }
-
-    private IEnumerator BotSpawnCycle()
-    {
-        bool isWorking = true;
-        var waitTime = new WaitForSeconds(_botSpawnDelay);
-
-        while (isWorking == true)
-        {
-            SpawnBot();
-            yield return waitTime;
-        }
-    }
-
+    
     private IEnumerator BotOrderCycle()
     {
         bool isWorking = true;

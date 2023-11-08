@@ -1,7 +1,6 @@
-using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
-using Random = UnityEngine.Random;
 
 public class ResourceSpawner : MonoBehaviour
 {
@@ -10,10 +9,11 @@ public class ResourceSpawner : MonoBehaviour
     [SerializeField] private float _radius;
     [SerializeField] private float _delay;
 
-    public event Action<Transform> Spawned;
+    private List<Transform> _resourcePoints;
 
     private void Start()
     {
+        _resourcePoints = new List<Transform>();
         StartCoroutine(SpawnCycle());
     }
 
@@ -23,11 +23,17 @@ public class ResourceSpawner : MonoBehaviour
         Gizmos.DrawWireSphere(transform.position, _radius);
     }
 
+    public List<Transform> GetExistsResources()
+    {
+        return _resourcePoints;
+    }
+
     private void Spawn()
     {
         Vector3 spawnPosition = new Vector3(Random.Range(-_radius, _radius), 0 , Random.Range(-_radius, _radius))  + transform.position;
         Resource resource = Instantiate(_template, spawnPosition, Quaternion.identity, _holder);
-        Spawned?.Invoke(resource.transform);
+        
+        _resourcePoints.Add(resource.transform);
     }
 
     private IEnumerator SpawnCycle()
