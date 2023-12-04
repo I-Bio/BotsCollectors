@@ -1,25 +1,34 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Events;
 
 public class BaseBotCommander : MonoBehaviour
 {
     [SerializeField] private ResourceSpawner _resourceSpawner;
     [SerializeField] private BotSpawner _botSpawner;
-    [SerializeField] private Transform _stockPoint;
+    [SerializeField] private Stock _stock;
+    [SerializeField] private BaseScanner _baseScanner;
+    [SerializeField] private UnityEvent _selected;
+    [SerializeField] private UnityEvent _deselected;
     [SerializeField] private float _botOrderDelay;
+    [SerializeField] private int _buildCost;
 
-    private List<Transform> _availableResourcePoints;
     private Queue<BotMover> _waitingBots;
+    private BaseBuilder _baseBuilder;
+    private bool _isNeedBuild;
+
     
     private void OnEnable()
     {
-        _availableResourcePoints = new List<Transform>();
         _waitingBots = new Queue<BotMover>();
-        
-        StartCoroutine(BotOrderCycle());
 
         _botSpawner.Spawned += OnSpawnBot;
+    }
+
+    private void Start()
+    {
+        StartCoroutine(BotOrderCycle());
     }
 
     private void OnDisable()
@@ -32,15 +41,54 @@ public class BaseBotCommander : MonoBehaviour
         }
     }
 
-    private void Update()
+    public void Select()
     {
-        ScanForResources();
+        _selected?.Invoke();
+    }
+
+    public void Deselect()
+    {
+        _deselected?.Invoke();
+    }
+
+    public void TakeControlUnderBot(BotMover bot)
+    {
+        _botSpawner.TakeControl(bot);
+    }
+    
+    public void ResetControlUnderBot(BotMover bot)
+    {
+        bot.Waited -= OnWaitingBot;
+        _botSpawner.GetExistsBots().Remove(bot);
+        _botSpawner.SetCanSpawn(true);
+    }
+
+    public void CreateBuildOrder(BaseBuilder baseBuilder)
+    {
+        _baseBuilder = baseBuilder;
+        _isNeedBuild = true;
+        _botSpawner.SetCanSpawn(false);
+    }
+
+    public void SetResourceSpawner(ResourceSpawner resourceSpawner)
+    {
+        _resourceSpawner = resourceSpawner;
+    }
+
+    public ResourceSpawner GetResourceSpawner()
+    {
+        return _resourceSpawner;
+    }
+
+    public int GetWaitingBotsCount()
+    {
+        return _waitingBots.Count;
     }
 
     private void OnSpawnBot(BotMover bot)
     {
         bot.Waited += OnWaitingBot;
-        bot.SetStock(_stockPoint);
+        bot.SetStock(_stock.StockPoint);
     }
     
     private void OnWaitingBot(BotMover bot)
@@ -48,14 +96,29 @@ public class BaseBotCommander : MonoBehaviour
         _waitingBots.Enqueue(bot);
     }
 
-    private void ScanForResources()
-    {
-        _availableResourcePoints = _resourceSpawner.GetExistsResources();
-    }
-
     private void GiveBotOrder()
     {
-        if (_availableResourcePoints.Count > 0 && _waitingBots.Count > 0)
+        if (_isNeedBuild == true && _waitingBots.Count > 0 && _stock.CollectedResourceCount >= _buildCost)
+        {
+            BotMover bot = _waitingBots.Dequeue();
+            
+            if (bot.IsWaitNotEmpty == false)
+            {
+                _isNeedBuild = false;
+                _stock.DecreaseResource(_buildCost);
+                _baseBuilder.SetBotBuilder(bot);
+                bot.SetTarget(_baseBuilder.transform);
+                bot.StartWork();
+            }
+            else
+            {
+                _waitingBots.Enqueue(bot);
+            }
+            
+            return;
+        }
+        
+        if (_baseScanner.GetResourcePoints().Count > 0 && _waitingBots.Count > 0)
         {
             BotMover bot = _waitingBots.Dequeue();
             Transform target = GetLessDistancePoint(bot.transform.position);
@@ -65,7 +128,7 @@ public class BaseBotCommander : MonoBehaviour
             return;
         }
 
-        if (_availableResourcePoints.Count <= 0 && _waitingBots.Count > 0 && AreNotEmptyBots() == true)
+        if (_baseScanner.GetResourcePoints().Count <= 0 && _waitingBots.Count > 0 && AreNotEmptyBots() == true)
         {
             if (_waitingBots.Peek().IsWaitNotEmpty == true)
             {
@@ -83,19 +146,20 @@ public class BaseBotCommander : MonoBehaviour
     
     private Transform GetLessDistancePoint(Vector3 botPosition)
     {
-        Transform point = _availableResourcePoints[0];
+        List<Transform> availableResourcePoints = _baseScanner.GetResourcePoints();
+        Transform point = availableResourcePoints[0];
         float distance = Vector3.Distance(botPosition, point.position);
 
-        foreach (Transform resourcePoint in _availableResourcePoints)
+        foreach (Transform resourcePoint in availableResourcePoints)
         {
-            if (IsLessDistance(botPosition, resourcePoint.position, distance, out float newDistance))
+            if (IsLessDistance(botPosition, resourcePoint.position, distance, out float newDistance) == true)
             {
                 distance = newDistance;
                 point = resourcePoint;
             }
         }
-
-        _availableResourcePoints.Remove(point);
+        
+        availableResourcePoints.Remove(point);
         
         return point;
     }

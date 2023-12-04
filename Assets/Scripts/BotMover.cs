@@ -9,7 +9,6 @@ public class BotMover : MonoBehaviour
 
     private Rigidbody _rigidbody;
     private BotResourceHolder _resourceHolder;
-    private Transform _stockPoint;
     private Transform _target;
     private Coroutine _workCycle;
     private bool _canMove;
@@ -18,7 +17,9 @@ public class BotMover : MonoBehaviour
     public event Action<BotMover> Waited;
     public event Action<Stock> StockReached;
 
+    public Transform StockPoint { get; private set; }
     public bool IsWaitNotEmpty => IsWait == true && _resourceHolder.IsNotEmpty == true;
+    public bool IsGoingToStock => _target == StockPoint;
     private bool IsWait => _target == null;
     
     private void OnEnable()
@@ -49,13 +50,19 @@ public class BotMover : MonoBehaviour
 
     public void SetStock(Transform stockPoint)
     {
-        _stockPoint = stockPoint;
-        StartCoroutine(WorkCycle());
+        bool isChangeStock = StockPoint is null;
+
+        StockPoint = stockPoint;
+        
+        if (isChangeStock == true)
+        {
+            _workCycle = StartCoroutine(WorkCycle());
+        }
     }
     
     public void SetTargetToStock()
     {
-        _target = _stockPoint;
+        _target = StockPoint;
     }
     
     public void StartWork()
@@ -67,9 +74,10 @@ public class BotMover : MonoBehaviour
     public void ReachStock(Stock stock)
     {
         _canMove = false;
+        _rigidbody.velocity = Vector3.zero;
         StockReached?.Invoke(stock);
     }
-    
+
     private void CheckWorkCycle()
     {
         if (_canStartedWork == true && IsWait == false)
@@ -88,16 +96,14 @@ public class BotMover : MonoBehaviour
     {
         if (_canMove == true)
         {
-            SetRotation();
             Vector3 moveDirection = (_target.position - transform.position).normalized;
-
+            SetRotation(moveDirection);
             _rigidbody.velocity = moveDirection * _speed;
         }
     }
     
-    private void SetRotation()
+    private void SetRotation(Vector3 moveDirection)
     {
-        Vector3 moveDirection = (_target.position - transform.position).normalized;
         float angleOfRotation = Mathf.Atan2(moveDirection.x, moveDirection.z) * Mathf.Rad2Deg;
         
         if (angleOfRotation < 0)
@@ -116,6 +122,8 @@ public class BotMover : MonoBehaviour
             yield return null;
         }
         
+        _rigidbody.velocity = Vector3.zero;
+
         Waited?.Invoke(this);
     }
 }

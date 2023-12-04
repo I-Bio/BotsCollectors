@@ -3,21 +3,44 @@ using System.Collections;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
+[RequireComponent(typeof(MeshRenderer))]
 public class Stock : MonoBehaviour
 {
-    [SerializeField] private float _minStopDelay;
-    [SerializeField] private float _maxStopDelay;
+    [SerializeField] private Material _standard;
+    [SerializeField] private Material _selected;
+    [SerializeField] private Transform _stockPoint;
 
+    private MeshRenderer _meshRenderer;
+    
     public event Action ResourceChanged;
     
+    public Transform StockPoint => _stockPoint;
     public int CollectedResourceCount { get; private set; }
+
+    private void Start()
+    {
+        _meshRenderer = GetComponent<MeshRenderer>();
+    }
 
     private void OnTriggerEnter(Collider other)
     {
         if (other.TryGetComponent(out BotMover botMover))
         {
-            StartCoroutine(StopBot(botMover));
+            if (botMover.IsGoingToStock == true && botMover.StockPoint == _stockPoint)
+            {
+                botMover.ReachStock(this);
+            }
         }
+    }
+    
+    public void OnSelect()
+    {
+        _meshRenderer.material = _selected;
+    }
+
+    public void OnDeselect()
+    {
+        _meshRenderer.material = _standard;
     }
 
     public void IncreaseResource()
@@ -26,10 +49,9 @@ public class Stock : MonoBehaviour
         ResourceChanged?.Invoke();
     }
 
-    private IEnumerator StopBot(BotMover botMover)
+    public void DecreaseResource(int resourceCount)
     {
-        var waitTime = new WaitForSeconds(Random.Range(_minStopDelay, _maxStopDelay));
-        yield return waitTime;
-        botMover.ReachStock(this);
+        CollectedResourceCount -= resourceCount;
+        ResourceChanged?.Invoke();
     }
 }

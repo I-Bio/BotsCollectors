@@ -1,13 +1,17 @@
 using TMPro;
 using UnityEngine;
 
+[RequireComponent(typeof(TextMeshPro))]
 public class CollectedResourceShow : MonoBehaviour
 {
     [SerializeField] private Stock _stock;
-    [SerializeField] private TextMeshProUGUI _text;
+    
+    private TextMeshPro _text;
 
     private void OnEnable()
     {
+        _text = GetComponent<TextMeshPro>();
+        
         _stock.ResourceChanged += OnChangeResource;
     }
 
